@@ -56,6 +56,75 @@ with st.sidebar:
     st.info('Dieses Tool zeigt nur Analysen und Informationen. Es ist keine Kaufberatung.')
 
 
+def search_symbols(query):
+    client = get_finnhub_client()
+    if not client:
+        return []
+    try:
+        res = client.symbol_lookup(query)
+        return res.get('result', []) if isinstance(res, dict) else []
+    except Exception:
+        return []
+
+
+def format_symbol_candidates(results, limit=5):
+    items = []
+    for r in results[:limit]:
+        sym = r.get('symbol', '—')
+        desc = r.get('description', '—')
+        exchange = r.get('mic', '') or r.get('exchange', '') or r.get('type', '')
+        items.append(f"{sym} — {desc} ({exchange})")
+    return items
+
+
+def add_symbol_suggestions_block(query_text):
+    results = search_symbols(query_text)
+    if not results:
+        st.warning(f"Keine passende Aktie gefunden für: {query_text}")
+        st.info("Tipp: Probiere den Firmennamen oder die ISIN/WKN in kürzerer Form.")
+        return
+
+    st.warning(f"Keine direkte Quote gefunden für: {query_text}")
+    st.info("Mögliche Treffer aus der Börsensuche:")
+    candidates = format_symbol_candidates(results, limit=5)
+    for cand in candidates:
+        st.write(f"- {cand}")
+
+
+    new_stock = st.text_input("Neue Aktie hinzufügen (Ticker oder Firmenname)", placeholder="z.B. Rheinmetall oder RHM", key="new_stock_input")
+
+    if st.button("➕ Zur Watchlist hinzufügen", key="add_stock_btn"):
+        if new_stock.strip():
+            query_text = new_stock.strip()
+            quote = get_stock_quote(query_text.upper())
+
+            if quote and isinstance(quote, dict) and safe_num(quote.get('c')) > 0:
+                if query_text.upper() not in st.session_state['watchlist']:
+                    st.session_state['watchlist'].append(query_text.upper())
+                    st.success(f"{query_text.upper()} hinzugefügt!")
+                    st.rerun()
+            else:
+                st.warning(f"Keine direkte Quote gefunden für: {query_text}")
+                st.info("Mögliche Treffer aus der Börsensuche:")
+                results = search_symbols(query_text)
+                if results:
+                    for r in results[:5]:
+                        sym = r.get('symbol', '—')
+                        desc = r.get('description', '—')
+                        exchange = r.get('mic', '') or r.get('exchange', '') or r.get('type', '')
+                        col1, col2 = st.columns([4, 1])
+                        with col1:
+                            st.write(f"**{sym}** — {desc} ({exchange})")
+                        with col2:
+                            if st.button("Übernehmen", key=f"use_{sym}"):
+                                if sym not in st.session_state['watchlist']:
+                                    st.session_state['watchlist'].append(sym)
+                                    st.success(f"{sym} hinzugefügt!")
+                                    st.rerun()
+                else:
+                    st.info("Tipp: Probiere den Firmennamen, die ISIN oder einen kürzeren Ticker.")
+
+
 def get_finnhub_client():
     api_key = st.session_state.get('api_key', '')
     if not api_key:

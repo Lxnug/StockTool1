@@ -271,7 +271,13 @@ with tab1:
                     st.link_button('📖 Zum Artikel', news['url'])
     else:
         st.info('Noch keine News geladen. Klicke auf "Markt-Updates aktualisieren".')
-
+def safe_num(x, default=0.0):
+    try:
+        if x is None:
+            return default
+        return float(x)
+    except (TypeError, ValueError):
+        return default
 with tab2:
     st.header('📊 Live Watchlist')
     st.markdown('Echtzeit-Kurse und Analysen deiner Watchlist')
@@ -308,12 +314,12 @@ with tab2:
             q = item.get('quote', {})
             rows.append({
                 'Ticker': item.get('ticker', ''),
-                'Preis ($)': f"{q.get('c', 0):.2f}",
-                'Änderung ($)': f"{q.get('d', 0):.2f}",
-                'Änderung (%)': f"{q.get('dp', 0):.2f}%",
-                'Volumen': f"{q.get('v', 0):,}",
-                'High ($)': f"{q.get('h', 0):.2f}",
-                'Low ($)': f"{q.get('l', 0):.2f}"
+                'Preis ($)': f"{safe_num(q.get('c')):.2f}",
+'Änderung ($)': f"{safe_num(q.get('d')):.2f}",
+'Änderung (%)': f"{safe_num(q.get('dp')):.2f}%",
+'Volumen': f"{int(safe_num(q.get('v'))):,}",
+'High ($)': f"{safe_num(q.get('h')):.2f}",
+'Low ($)': f"{safe_num(q.get('l')):.2f}"
             })
         df = pd.DataFrame(rows)
         st.dataframe(df, use_container_width=True, hide_index=True)

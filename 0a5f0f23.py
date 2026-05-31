@@ -148,22 +148,31 @@ with tab1:
     st.header('📰 Tägliches Markt-Update')
     st.markdown('Die wichtigsten Marktnews und Kursbewegungen für heute')
 
+    def get_symbols(item):
+        raw = item.get('symbol', '') or item.get('symbols', '') or ''
+        if isinstance(raw, list):
+            raw = ', '.join([str(x) for x in raw if x])
+        raw = str(raw).strip()
+        if not raw or raw.lower() == 'n/a':
+            return '—'
+        return raw
+
     def translate_market_impact(item):
-        headline = str(item.get('headline', ''))
-        summary = str(item.get('summary', ''))
+        headline = str(item.get('headline', '')).strip()
+        summary = str(item.get('summary', '')).strip()
         text = (headline + ' ' + summary).lower()
 
-        positive = ['beat', 'beats', 'upgrade', 'raises', 'strong', 'profit', 'growth', 'record', 'buyback', 'guidance up', 'acquisition', 'approval', 'approved', 'surge', 'rally', 'higher']
-        negative = ['miss', 'downgrade', 'cuts', 'lower', 'loss', 'lawsuit', 'probe', 'investigation', 'delay', 'warning', 'recall', 'fall', 'drop', 'slump', 'recession', 'rates higher']
+        positive = ['beat', 'beats', 'upgrade', 'raises', 'strong', 'profit', 'growth', 'record', 'buyback', 'guidance up', 'acquisition', 'approval', 'approved', 'surge', 'rally', 'higher', 'bullish', 'outperforms']
+        negative = ['miss', 'downgrade', 'cuts', 'lower', 'loss', 'lawsuit', 'probe', 'investigation', 'delay', 'warning', 'recall', 'fall', 'drop', 'slump', 'recession', 'rates higher', 'bearish']
 
-        pos = sum(1 for w in positive if w in text)
-        neg = sum(1 for w in negative if w in text)
+        pos_hits = [w for w in positive if w in text]
+        neg_hits = [w for w in negative if w in text]
 
-        if pos > neg:
+        if len(pos_hits) > len(neg_hits):
             direction = 'positiv'
             impact = 'kann den Kurs eher stützen oder kurzfristig antreiben.'
             color = '🟢'
-        elif neg > pos:
+        elif len(neg_hits) > len(pos_hits):
             direction = 'negativ'
             impact = 'kann Druck auf den Kurs ausüben oder Volatilität erhöhen.'
             color = '🔴'
@@ -172,16 +181,28 @@ with tab1:
             impact = 'dürfte eher geringe direkte Kurswirkung haben.'
             color = '🟡'
 
-        short_de = headline if headline else 'Keine Überschrift verfügbar.'
-        if summary:
-            short_de = f'{headline}. {summary[:180]}' if headline else summary[:180]
+        if headline and summary:
+            short_de = f'{headline}. {summary[:220]}'
+        elif headline:
+            short_de = headline
+        elif summary:
+            short_de = summary[:220]
+        else:
+            short_de = 'Keine verwertbare Meldung vorhanden.'
+
+        if pos_hits:
+            reason = f'Positive Schlagwörter gefunden: {", ".join(pos_hits[:4])}'
+        elif neg_hits:
+            reason = f'Negative Schlagwörter gefunden: {", ".join(neg_hits[:4])}'
+        else:
+            reason = 'Keine klaren Kurs-Treiber erkannt; eher neutrale Meldung.'
 
         return {
             'direction': direction,
             'impact': impact,
             'color': color,
             'short_de': short_de,
-            'reason': 'Einfache Textanalyse von Schlagwörtern in Überschrift und Zusammenfassung.'
+            'reason': reason
         }
 
     if st.button('🔄 Markt-Updates aktualisieren', key='refresh_market_news'):
@@ -206,16 +227,16 @@ with tab1:
             st.subheader('🚨 Potenziell kursrelevante News')
             for news, impact in important_news[:10]:
                 title = news.get('headline', 'Ohne Titel')
-                symbol = news.get('symbol', 'N/A')
-                dt = news.get('datetime', '')
-                source = news.get('source', '')
+                symbol = get_symbols(news)
+                source = news.get('source', '—')
+                date_raw = news.get('datetime', '')
                 st.markdown(f"""
                 <div class="news-card">
                     <strong>{impact['color']} {title}</strong><br>
-                    <small><b>Deutsch:</b> {impact['short_de'][:250]}...</small><br>
+                    <small><b>Deutsch:</b> {impact['short_de'][:260]}...</small><br>
                     <small><b>Marktwirkung:</b> {impact['direction']} – {impact['impact']}</small><br>
-                    <small><b>Warum:</b> {impact['reason']}</small><br>
-                    <small>📊 Symbol: {symbol} | 🕒 {dt} | Quelle: {source}</small>
+                    <small><b>Begründung:</b> {impact['reason']}</small><br>
+                    <small><b>Symbol:</b> {symbol} | <b>Quelle:</b> {source} | <b>Zeit:</b> {date_raw}</small>
                 </div>
                 """, unsafe_allow_html=True)
                 if news.get('url'):
@@ -225,11 +246,14 @@ with tab1:
         st.subheader('📰 Alle Markt-News')
         for news in general_news[10:25]:
             impact = translate_market_impact(news)
-            with st.expander(f"{impact['color']} {news.get('headline', 'Ohne Titel')}"):
+            title = news.get('headline', 'Ohne Titel')
+            symbol = get_symbols(news)
+            source = news.get('source', '—')
+            with st.expander(f"{impact['color']} {title}"):
                 st.write(f"**Kurz auf Deutsch:** {impact['short_de']}")
                 st.write(f"**Mögliche Marktwirkung:** {impact['direction']} – {impact['impact']}")
                 st.write(f"**Begründung:** {impact['reason']}")
-                st.write(f"**Symbol:** {news.get('symbol', 'N/A')} | **Quelle:** {news.get('source', '')}")
+                st.write(f"**Symbol:** {symbol} | **Quelle:** {source}")
                 if news.get('url'):
                     st.link_button('📖 Zum Artikel', news['url'])
     else:

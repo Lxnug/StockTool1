@@ -355,13 +355,94 @@ with tab2:
 
 with tab3:
     st.header('⚡ Gewinner')
-    st.write('Hier kannst du später die stärksten Kursgewinner anzeigen.')
-    st.info('Dieser Tab ist vorbereitet und kann mit den Top-Performern gefüllt werden.')
+    st.markdown('Aktien mit starker positiver Bewegung und Momentum')
+
+    watchlist_data = st.session_state.get('watchlist_data', [])
+    gainers = []
+    for item in watchlist_data:
+        q = item.get('quote', {})
+        dp = safe_num(q.get('dp'))
+        if dp > 0:
+            gainers.append((item, dp))
+    gainers = sorted(gainers, key=lambda x: x[1], reverse=True)
+
+    if gainers:
+        st.subheader('📈 Top Gewinner aus deiner Watchlist')
+        for item, dp in gainers:
+            q = item.get('quote', {})
+            ticker = item.get('ticker', '')
+            price = safe_num(q.get('c'))
+            change = safe_num(q.get('d'))
+            volume = int(safe_num(q.get('v')))
+            symbol_news = item.get('news', [])
+            news_score = 'neutral'
+            if symbol_news:
+                first = symbol_news[0]
+                text = f"{first.get('headline', '')} {first.get('summary', '')}".lower()
+                if any(w in text for w in ['beat', 'upgrade', 'strong', 'raise', 'record', 'rally', 'buy']):
+                    news_score = 'positiv'
+                elif any(w in text for w in ['miss', 'downgrade', 'warning', 'delay', 'lawsuit', 'probe']):
+                    news_score = 'negativ'
+            st.markdown(f"""
+            <div class="news-card">
+                <strong>🟢 {ticker}</strong><br>
+                <small><b>Kurs:</b> ${price:.2f} | <b>Änderung:</b> {dp:.2f}% ({change:+.2f})</small><br>
+                <small><b>Volumen:</b> {volume:,}</small><br>
+                <small><b>News-Tendenz:</b> {news_score}</small><br>
+                <small><b>Momentum-Einschätzung:</b> stark, wenn Kurs + Volumen + News gemeinsam positiv sind.</small>
+            </div>
+            """, unsafe_allow_html=True)
+            if item.get('news'):
+                with st.expander(f'📰 News zu {ticker}'):
+                    for news in item['news'][:3]:
+                        st.write(f"**{news.get('headline', '')}**")
+                        st.write(f"{str(news.get('summary', ''))[:180]}...")
+                        if news.get('url'):
+                            st.link_button('📖 Artikel', news['url'])
+                        st.divider()
+    else:
+        st.info('Noch keine klaren Gewinner in deiner Watchlist gefunden.')
+
+    st.subheader('💡 Geheimtipps / Momentum-Check')
+    if gainers:
+        best_item, best_dp = gainers[0]
+        best_ticker = best_item.get('ticker', '')
+        st.success(f'Aktuell stärkster Kandidat: {best_ticker} mit {best_dp:.2f}%')
+        st.write('Achte hier auf hohes Volumen und positive News, dann ist der Move oft interessanter als nur ein roter/ grüner Tageswert.')
+    else:
+        st.write('Sobald deine Watchlist mehr Werte enthält, erscheinen hier die spannendsten Momentum-Kandidaten.')
 
 with tab4:
     st.header('🔥 Verlierer')
-    st.write('Hier kannst du später die stärksten Kursverlierer anzeigen.')
-    st.info('Dieser Tab ist vorbereitet und kann mit den stärksten Minus-Aktien gefüllt werden.')
+    st.markdown('Aktien mit negativer Bewegung und möglichem Rebound- oder Risiko-Charakter')
+
+    watchlist_data = st.session_state.get('watchlist_data', [])
+    losers = []
+    for item in watchlist_data:
+        q = item.get('quote', {})
+        dp = safe_num(q.get('dp'))
+        if dp < 0:
+            losers.append((item, dp))
+    losers = sorted(losers, key=lambda x: x[1])
+
+    if losers:
+        st.subheader('📉 Top Verlierer aus deiner Watchlist')
+        for item, dp in losers:
+            q = item.get('quote', {})
+            ticker = item.get('ticker', '')
+            price = safe_num(q.get('c'))
+            change = safe_num(q.get('d'))
+            volume = int(safe_num(q.get('v')))
+            st.markdown(f"""
+            <div class="news-card">
+                <strong>🔴 {ticker}</strong><br>
+                <small><b>Kurs:</b> ${price:.2f} | <b>Änderung:</b> {dp:.2f}% ({change:+.2f})</small><br>
+                <small><b>Volumen:</b> {volume:,}</small><br>
+                <small><b>Hinweis:</b> starke Verluste können Rebound-Chancen oder Warnsignale sein.</small>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info('Noch keine Verlierer in deiner Watchlist gefunden.')
 
 with tab5:
     st.header('ℹ️ Info')

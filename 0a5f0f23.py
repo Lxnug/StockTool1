@@ -147,41 +147,91 @@ tab1, tab2, tab3, tab4 = st.tabs(['🔥 Tägliches Markt-Update', '📊 Live Wat
 with tab1:
     st.header('📰 Tägliches Markt-Update')
     st.markdown('Die wichtigsten Marktnews und Kursbewegungen für heute')
+
+    def translate_market_impact(item):
+        headline = str(item.get('headline', ''))
+        summary = str(item.get('summary', ''))
+        text = (headline + ' ' + summary).lower()
+
+        positive = ['beat', 'beats', 'upgrade', 'raises', 'strong', 'profit', 'growth', 'record', 'buyback', 'guidance up', 'acquisition', 'approval', 'approved', 'surge', 'rally', 'higher']
+        negative = ['miss', 'downgrade', 'cuts', 'lower', 'loss', 'lawsuit', 'probe', 'investigation', 'delay', 'warning', 'recall', 'fall', 'drop', 'slump', 'recession', 'rates higher']
+
+        pos = sum(1 for w in positive if w in text)
+        neg = sum(1 for w in negative if w in text)
+
+        if pos > neg:
+            direction = 'positiv'
+            impact = 'kann den Kurs eher stützen oder kurzfristig antreiben.'
+            color = '🟢'
+        elif neg > pos:
+            direction = 'negativ'
+            impact = 'kann Druck auf den Kurs ausüben oder Volatilität erhöhen.'
+            color = '🔴'
+        else:
+            direction = 'neutral'
+            impact = 'dürfte eher geringe direkte Kurswirkung haben.'
+            color = '🟡'
+
+        short_de = headline if headline else 'Keine Überschrift verfügbar.'
+        if summary:
+            short_de = f'{headline}. {summary[:180]}' if headline else summary[:180]
+
+        return {
+            'direction': direction,
+            'impact': impact,
+            'color': color,
+            'short_de': short_de,
+            'reason': 'Einfache Textanalyse von Schlagwörtern in Überschrift und Zusammenfassung.'
+        }
+
     if st.button('🔄 Markt-Updates aktualisieren', key='refresh_market_news'):
         st.session_state['market_news_loaded'] = False
         st.rerun()
+
     if 'market_news_loaded' not in st.session_state or not st.session_state['market_news_loaded']:
         with st.spinner('Lade Markt-News...'):
             st.session_state['general_news'] = get_general_market_news(days=1)
             st.session_state['market_news_loaded'] = True
+
     general_news = st.session_state.get('general_news', [])
     if general_news:
         st.success(f'✅ {len(general_news)} News gefunden')
         important_news = []
-        for news in general_news[:15]:
-            if news.get('sentiment', 'neutral') in ['positive', 'veryPositive'] or news.get('priceSensitive'):
-                important_news.append(news)
+        for news in general_news[:20]:
+            impact = translate_market_impact(news)
+            if impact['direction'] != 'neutral' or news.get('priceSensitive'):
+                important_news.append((news, impact))
+
         if important_news:
             st.subheader('🚨 Potenziell kursrelevante News')
-            for news in important_news[:10]:
+            for news, impact in important_news[:10]:
+                title = news.get('headline', 'Ohne Titel')
+                symbol = news.get('symbol', 'N/A')
+                dt = news.get('datetime', '')
+                source = news.get('source', '')
                 st.markdown(f"""
                 <div class="news-card">
-                    <strong>{news.get('headline', '')}</strong><br>
-                    <small>{str(news.get('summary', ''))[:200]}...</small><br>
-                    <small>📊 Symbol: {news.get('symbol', 'N/A')} | ⏰ {news.get('datetime', '')}</small><br>
-                    <small>Emotion: <strong>{news.get('sentiment', 'neutral')}</strong></small>
+                    <strong>{impact['color']} {title}</strong><br>
+                    <small><b>Deutsch:</b> {impact['short_de'][:250]}...</small><br>
+                    <small><b>Marktwirkung:</b> {impact['direction']} – {impact['impact']}</small><br>
+                    <small><b>Warum:</b> {impact['reason']}</small><br>
+                    <small>📊 Symbol: {symbol} | 🕒 {dt} | Quelle: {source}</small>
                 </div>
                 """, unsafe_allow_html=True)
                 if news.get('url'):
-                    st.link_button('📖 Vollständiger Artikel', news['url'])
+                    st.link_button('📖 Zum Originalartikel', news['url'])
                 st.divider()
+
         st.subheader('📰 Alle Markt-News')
         for news in general_news[10:25]:
-            with st.expander(f"{news.get('headline', '')}"):
-                st.write(news.get('summary', ''))
+            impact = translate_market_impact(news)
+            with st.expander(f"{impact['color']} {news.get('headline', 'Ohne Titel')}"):
+                st.write(f"**Kurz auf Deutsch:** {impact['short_de']}")
+                st.write(f"**Mögliche Marktwirkung:** {impact['direction']} – {impact['impact']}")
+                st.write(f"**Begründung:** {impact['reason']}")
+                st.write(f"**Symbol:** {news.get('symbol', 'N/A')} | **Quelle:** {news.get('source', '')}")
                 if news.get('url'):
                     st.link_button('📖 Zum Artikel', news['url'])
-                st.write(f"**Semantik:** {news.get('sentiment', 'neutral')} | **Zeitraum:** {news.get('datetime', '')}")
     else:
         st.info('Noch keine News geladen. Klicke auf "Markt-Updates aktualisieren".')
 

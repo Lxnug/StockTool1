@@ -2,47 +2,106 @@
 Stock Market News & Watchlist Tool
 """
 
+import os
 import streamlit as st
-import finnhub
-from datetime import datetime, timedelta
 import pandas as pd
+import finnhub
+from deep_translator import GoogleTranslator
 
-st.set_page_config(page_title="Stock Market News & Watchlist", page_icon="📈", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title='Stock Tool', layout='wide')
 
-st.markdown("""
-<style>
-.main-header { font-size: 2.5rem; font-weight: bold; color: #1e88e5; margin-bottom: 1rem; }
-.metric-card { background-color: #f5f5f5; padding: 1rem; border-radius: 0.5rem; margin: 0.5rem 0; }
-.positive { color: #2e7d32; font-weight: bold; }
-.negative { color: #c62828; font-weight: bold; }
-.news-card { background-color: #fff3e0; padding: 1rem; border-left: 4px solid #ff9800; margin: 0.5rem 0; border-radius: 0.25rem; }
-</style>
-""", unsafe_allow_html=True)
+if 'watchlist' not in st.session_state:
+    st.session_state['watchlist'] = []
+if 'watchlist_data' not in st.session_state:
+    st.session_state['watchlist_data'] = None
+if 'general_news' not in st.session_state:
+    st.session_state['general_news'] = []
+if 'market_news_loaded' not in st.session_state:
+    st.session_state['market_news_loaded'] = False
+if 'watchlist_search_results' not in st.session_state:
+    st.session_state['watchlist_search_results'] = []
+if 'watchlist_search_term' not in st.session_state:
+    st.session_state['watchlist_search_term'] = ''
+
+
+def get_finnhub_client():
+    api_key = os.environ.get('FINNHUB_API_KEY', '')
+    if not api_key:
+        st.error('FINNHUB_API_KEY fehlt in den Umgebungsvariablen.')
+        return None
+    return finnhub.Client(api_key=api_key)
+
+
+def safe_num(x, default=0.0):
+    try:
+        if x is None:
+            return default
+        return float(x)
+    except (TypeError, ValueError):
+        return default
+
+
+def search_symbols(query):
+    client = get_finnhub_client()
+    if not client:
+        return []
+    try:
+        res = client.symbol_lookup(query)
+        return res.get('result', []) if isinstance(res, dict) else []
+    except Exception:
+        return []
+
+
+def get_stock_quote(symbol):
+    client = get_finnhub_client()
+    if not client:
+        return None
+    try:
+        return client.quote(symbol)
+    except Exception:
+        return None
+
+
+def get_stock_news(symbol, days=7):
+    client = get_finnhub_client()
+    if not client:
+        return []
+    try:
+        from datetime import date, timedelta
+        to_date = date.today()
+        from_date = to_date - timedelta(days=days)
+        return client.company_news(symbol, _from=from_date.isoformat(), to=to_date.isoformat())
+    except Exception:
+        return []
+
+
+def get_recommendations(symbol):
+    client = get_finnhub_client()
+    if not client:
+        return None
+    try:
+        recs = client.recommendation_trends(symbol)
+        return recs[0] if recs else None
+    except Exception:
+        return None
+
+
+def get_general_market_news(days=1):
+    client = get_finnhub_client()
+    if not client:
+        return []
+    try:
+        from datetime import date, timedelta
+        to_date = date.today()
+        from_date = to_date - timedelta(days=days)
+        return client.general_news('general', _from=from_date.isoformat(), to=to_date.isoformat())
+    except Exception:
+        return []
+
 
 with st.sidebar:
     st.header('➕ Aktie hinzufügen')
     st.caption('Gib Ticker oder Firmennamen ein')
-
-    if 'watchlist' not in st.session_state:
-        st.session_state['watchlist'] = []
-
-    def safe_num(x, default=0.0):
-        try:
-            if x is None:
-                return default
-            return float(x)
-        except (TypeError, ValueError):
-            return default
-
-    def search_symbols(query):
-        client = get_finnhub_client()
-        if not client:
-            return []
-        try:
-            res = client.symbol_lookup(query)
-            return res.get('result', []) if isinstance(res, dict) else []
-        except Exception:
-            return []
 
     new_stock = st.text_input('Neue Aktie hinzufügen', placeholder='z.B. NVDA oder Rheinmetall', key='watchlist_search_input')
 
@@ -85,156 +144,9 @@ with st.sidebar:
             if st.button('✖', key=f'remove_{ticker}_{i}'):
                 st.session_state['watchlist'].pop(i)
                 st.rerun()
-    
-    st.info(f"Watchlist hat {len(st.session_state['watchlist'])} Aktien")
-    new_stock = st.text_input("Neue Aktie hinzufügen (Ticker)", placeholder="z.B. NVDA", key="new_stock_input")
-    if st.button("➕ Zur Watchlist hinzufügen", key="add_stock_btn"):
-        if new_stock.strip() and new_stock.upper() not in st.session_state['watchlist']:
-            st.session_state['watchlist'].append(new_stock.upper())
-            st.success(f"{new_stock.upper()} hinzugefügt!")
-            st.rerun()
-
-    st.subheader("Aktuelle Watchlist")
-    for i, ticker in enumerate(list(st.session_state['watchlist'])):
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            st.write(f"📌 {ticker}")
-        with c2:
-            if st.button("🗑️", key=f"remove_{i}"):
-                st.session_state['watchlist'].pop(i)
-                st.rerun()
-
-    st.divider()
-    st.header("🔔 Benachrichtigungen")
-    st.checkbox("Tägliche Marktupdates aktivieren", value=True, key="daily_notify")
-    st.checkbox("Wichtige News-API aktivieren", value=True, key="news_notify")
-    st.info('Dieses Tool zeigt nur Analysen und Informationen. Es ist keine Kaufberatung.')
 
 
-def search_symbols(query):
-    client = get_finnhub_client()
-    if not client:
-        return []
-    try:
-        res = client.symbol_lookup(query)
-        return res.get('result', []) if isinstance(res, dict) else []
-    except Exception:
-        return []
-
-
-def format_symbol_candidates(results, limit=5):
-    items = []
-    for r in results[:limit]:
-        sym = r.get('symbol', '—')
-        desc = r.get('description', '—')
-        exchange = r.get('mic', '') or r.get('exchange', '') or r.get('type', '')
-        items.append(f"{sym} — {desc} ({exchange})")
-    return items
-
-
-def add_symbol_suggestions_block(query_text):
-    results = search_symbols(query_text)
-    if not results:
-        st.warning(f"Keine passende Aktie gefunden für: {query_text}")
-        st.info("Tipp: Probiere den Firmennamen oder die ISIN/WKN in kürzerer Form.")
-        return
-
-    st.warning(f"Keine direkte Quote gefunden für: {query_text}")
-    st.info("Mögliche Treffer aus der Börsensuche:")
-    candidates = format_symbol_candidates(results, limit=5)
-    for cand in candidates:
-        st.write(f"- {cand}")
-
-
-def get_finnhub_client():
-    api_key = st.session_state.get('api_key', '')
-    if not api_key:
-        st.error("❌ Bitte zuerst Finnhub API-Key in der Sidebar eingeben!")
-        return None
-    return finnhub.Client(api_key=api_key)
-
-
-def get_stock_quote(ticker):
-    client = get_finnhub_client()
-    if not client:
-        return None
-    try:
-        return client.quote(ticker)
-    except Exception as e:
-        st.warning(f"Konnte {ticker} nicht laden: {e}")
-        return None
-
-
-def get_stock_news(ticker, days=7):
-    client = get_finnhub_client()
-    if not client:
-        return []
-    try:
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
-        return client.company_news(ticker, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))[:20]
-    except Exception as e:
-        st.warning(f"Konnte News für {ticker} nicht laden: {e}")
-        return []
-
-
-def get_general_market_news(days=1):
-    client = get_finnhub_client()
-    if not client:
-        return []
-    try:
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
-        return client.general_news(start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))[:30]
-    except Exception as e:
-        st.warning(f"Konnte Markt-News nicht laden: {e}")
-        return []
-
-
-def get_recommendations(ticker):
-    client = get_finnhub_client()
-    if not client:
-        return None
-    try:
-        rec = client.stock_recommendations(ticker)
-        return rec[-1] if rec else None
-    except Exception:
-        return None
-
-
-def calculate_buy_recommendation(ticker):
-    quote = get_stock_quote(ticker)
-    if not quote or quote.get('c', 0) == 0:
-        return None
-    current = quote['c']
-    change = quote['d']
-    change_percent = quote['dp']
-    result = {'current_price': current, 'change': change, 'change_percent': change_percent, 'analysis': []}
-
-    if change_percent > 2:
-        result['analysis'].append({'option': 'Limit Order', 'reason': f'Aktie steigt stark ({change_percent:.2f}%). Limit Order bei {current*0.97:.2f} könnte besseren Einstiegspreis bieten.', 'confidence': 'medium', 'price_suggestion': current * 0.97})
-        result['analysis'].append({'option': 'Warten auf Rücksetzer', 'reason': f'Starker Anstieg könnte Korrektur folgen. Warte auf Rücksetzer zu {current*0.95:.2f}.', 'confidence': 'high', 'price_suggestion': current * 0.95})
-    elif change_percent < -2:
-        result['analysis'].append({'option': 'Market Order', 'reason': f'Aktie fällt stark ({change_percent:.2f}%). Guter Einstiegspreis könnte erreicht werden.', 'confidence': 'medium', 'price_suggestion': current})
-        result['analysis'].append({'option': 'Limit Order', 'reason': f'Setze Limit bei {current*0.98:.2f} für noch besseren Preis.', 'confidence': 'low', 'price_suggestion': current * 0.98})
-    else:
-        result['analysis'].append({'option': 'Limit Order', 'reason': f'Seitwärtsbewegung. Limit Order bei {current*0.99:.2f} ist sicher.', 'confidence': 'high', 'price_suggestion': current * 0.99})
-        result['analysis'].append({'option': 'Market Order', 'reason': 'Wenn du sofort einsteigen willst, nutze Market Order.', 'confidence': 'medium', 'price_suggestion': current})
-    return result
-
-
-st.markdown('<p class="main-header">📈 Stock Market News & Watchlist Tool</p>', unsafe_allow_html=True)
-st.markdown('Tägliche Marktupdates, Live-Watchlist und Analyse-Tools')
-
-if 'api_key' not in st.session_state:
-    st.warning('⚠️ Bitte Finnhub API-Key in der Sidebar eingeben, um fortzufahren.')
-    st.info('📌 Du kannst einen kostenlosen API-Key bei Finnhub.io erhalten.')
-    st.stop()
-
-
-tab1, tab2, tab3, tab4 = st.tabs(['🔥 Tägliches Markt-Update', '📊 Live Watchlist', '💡 Aktie/Krypto Tipps', '🎯 Kaufoptionen-Analyse'])
-
-from deep_translator import GoogleTranslator
+tab1, tab2, tab3 = st.tabs(['📰 News', '📊 Watchlist', 'ℹ️ Info'])
 
 with tab1:
     st.header('📰 Tägliches Markt-Update')

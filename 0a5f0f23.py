@@ -338,10 +338,13 @@ with tab2:
                 with c1:
                     st.metric('Aktueller Preis', f'${current_price:.2f}')
                 with c2:
-                    st.markdown(
-                        f"<div class={'positive' if change > 0 else 'negative'}>Änderung: ${change:.2f} ({change_percent:.2f}%)</div>",
-                        unsafe_allow_html=True
-                    )
+                    change = safe_num(q.get('d'))
+change_percent = safe_num(q.get('dp'))
+
+st.markdown(
+    f"<div class={'positive' if change > 0 else 'negative'}>Änderung: ${change:.2f} ({change_percent:.2f}%)</div>",
+    unsafe_allow_html=True
+)
                 with c3:
                     st.metric('Volumen', f'{volume:,}')
 

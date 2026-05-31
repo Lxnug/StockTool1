@@ -2,3 +2,4 @@ streamlit
 finnhub-python
 requests
 pandas
+deep-translator

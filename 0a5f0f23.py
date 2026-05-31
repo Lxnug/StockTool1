@@ -288,10 +288,10 @@ with tab3:
         st.info('Keine klaren Gewinner gefunden. Überprüfe später erneut oder füge mehr Aktien hinzu.')
     st.divider()
     st.subheader('🎯 Was du heute genauer ansehen solltest')
-    st.markdown('- Aktie mit mehr als 2% Kursänderung heute.
+    st.markdown('''- Aktie mit mehr als 2% Kursänderung heute.
 - Positive News mit priceSensitive Flag.
 - Hohe Volatilität.
-- Starke Analysten-Empfehlungen.')
+- Starke Analysten-Empfehlungen.''')
 
 with tab4:
     st.header('🎯 Beste Kaufoption für deine Watchlist')

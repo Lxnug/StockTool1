@@ -188,12 +188,15 @@ with tab1:
 with tab2:
     st.header('📊 Live Watchlist')
     st.markdown('Echtzeit-Kurse und Analysen deiner Watchlist')
+
     if st.button('🔄 Watchlist aktualisieren', key='refresh_watchlist'):
         st.session_state['watchlist_data'] = None
         st.rerun()
+
     if len(st.session_state.get('watchlist', [])) == 0:
         st.info('📝 Deine Watchlist ist leer. Füge Aktien in der Sidebar hinzu.')
         st.stop()
+
     if 'watchlist_data' not in st.session_state or st.session_state['watchlist_data'] is None:
         with st.spinner('Lade Watchlist-Daten...'):
             watchlist_data = []
@@ -201,38 +204,55 @@ with tab2:
                 quote = get_stock_quote(ticker)
                 news = get_stock_news(ticker, days=7)
                 rec = get_recommendations(ticker)
-                if quote:
-                    watchlist_data.append({'ticker': ticker, 'quote': quote, 'news': news, 'recommendations': rec})
+                if quote and isinstance(quote, dict):
+                    watchlist_data.append({
+                        'ticker': ticker,
+                        'quote': quote,
+                        'news': news,
+                        'recommendations': rec
+                    })
             st.session_state['watchlist_data'] = watchlist_data
+
     watchlist_data = st.session_state.get('watchlist_data', [])
     if watchlist_data:
         st.subheader('📈 Watchlist Überblick')
         rows = []
-for item in watchlist_data:
-    q = item.get('quote', {})
-    rows.append({
-        'Ticker': item.get('ticker', ''),
-        'Preis ($)': f"{q.get('c', 0):.2f}",
-        'Änderung ($)': f"{q.get('d', 0):.2f}",
-        'Änderung (%)': f"{q.get('dp', 0):.2f}%",
-        'Volumen': f"{q.get('v', 0):,}",
-        'High ($)': f"{q.get('h', 0):.2f}",
-        'Low ($)': f"{q.get('l', 0):.2f}",
-    })
-df = pd.DataFrame(rows)
+        for item in watchlist_data:
+            q = item.get('quote', {})
+            rows.append({
+                'Ticker': item.get('ticker', ''),
+                'Preis ($)': f"{q.get('c', 0):.2f}",
+                'Änderung ($)': f"{q.get('d', 0):.2f}",
+                'Änderung (%)': f"{q.get('dp', 0):.2f}%",
+                'Volumen': f"{q.get('v', 0):,}",
+                'High ($)': f"{q.get('h', 0):.2f}",
+                'Low ($)': f"{q.get('l', 0):.2f}"
+            })
+        df = pd.DataFrame(rows)
         st.dataframe(df, use_container_width=True, hide_index=True)
+
         st.subheader('🔍 Aktie Details')
         for item in watchlist_data:
-            with st.expander(f"📌 {item['ticker']} - ${item['quote']['c']:.2f}"):
-                quote = item['quote']
+            q = item.get('quote', {})
+            ticker = item.get('ticker', '')
+            current_price = q.get('c', 0)
+            change = q.get('d', 0)
+            change_percent = q.get('dp', 0)
+            volume = q.get('v', 0)
+
+            with st.expander(f'📌 {ticker} - ${current_price:.2f}'):
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    st.metric('Aktueller Preis', f"${quote['c']:.2f}")
+                    st.metric('Aktueller Preis', f'${current_price:.2f}')
                 with c2:
-                    st.markdown(f"<div class={'positive' if quote['d'] > 0 else 'negative'}>Änderung: ${quote['d']:.2f} ({quote['dp']:.2f}%)</div>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div class={'positive' if change > 0 else 'negative'}>Änderung: ${change:.2f} ({change_percent:.2f}%)</div>",
+                        unsafe_allow_html=True
+                    )
                 with c3:
-                    st.metric('Volumen', f"{quote['v']:,}")
-                if item['recommendations']:
+                    st.metric('Volumen', f'{volume:,}')
+
+                if item.get('recommendations'):
                     st.subheader('👨‍💼 Analysten-Empfehlungen')
                     rec = item['recommendations']
                     st.write(f"**Period:** {rec.get('period', '')}")
@@ -241,8 +261,96 @@ df = pd.DataFrame(rows)
                     st.write(f"**Hold:** {rec.get('hold', '')}")
                     st.write(f"**Sell:** {rec.get('sell', '')}")
                     st.write(f"**Strong Sell:** {rec.get('strongSell', '')}")
-                if item['news']:
-                    st.subheader(f"📰 Latest News für {item['ticker']}")
+
+                if item.get('news'):
+                    st.subheader(f'📰 Latest News für {ticker}')
+                    for news in item['news'][:5]:
+                        st.write(f"**{news.get('headline', '')}**")
+                        st.write(f"{str(news.get('summary', ''))[:150]}...")
+                        if news.get('url'):
+                            st.link_button('📖 Vollständiger Artikel', news['url'])
+                        st.write(f"*{news.get('datetime', '')} | Semantik: {news.get('sentiment', 'neutral')}*")
+                        st.divider()
+    else:
+        st.warning('Konnte Watchlist-Daten nicht laden.')with tab2:
+    st.header('📊 Live Watchlist')
+    st.markdown('Echtzeit-Kurse und Analysen deiner Watchlist')
+
+    if st.button('🔄 Watchlist aktualisieren', key='refresh_watchlist'):
+        st.session_state['watchlist_data'] = None
+        st.rerun()
+
+    if len(st.session_state.get('watchlist', [])) == 0:
+        st.info('📝 Deine Watchlist ist leer. Füge Aktien in der Sidebar hinzu.')
+        st.stop()
+
+    if 'watchlist_data' not in st.session_state or st.session_state['watchlist_data'] is None:
+        with st.spinner('Lade Watchlist-Daten...'):
+            watchlist_data = []
+            for ticker in st.session_state['watchlist']:
+                quote = get_stock_quote(ticker)
+                news = get_stock_news(ticker, days=7)
+                rec = get_recommendations(ticker)
+                if quote and isinstance(quote, dict):
+                    watchlist_data.append({
+                        'ticker': ticker,
+                        'quote': quote,
+                        'news': news,
+                        'recommendations': rec
+                    })
+            st.session_state['watchlist_data'] = watchlist_data
+
+    watchlist_data = st.session_state.get('watchlist_data', [])
+    if watchlist_data:
+        st.subheader('📈 Watchlist Überblick')
+        rows = []
+        for item in watchlist_data:
+            q = item.get('quote', {})
+            rows.append({
+                'Ticker': item.get('ticker', ''),
+                'Preis ($)': f"{q.get('c', 0):.2f}",
+                'Änderung ($)': f"{q.get('d', 0):.2f}",
+                'Änderung (%)': f"{q.get('dp', 0):.2f}%",
+                'Volumen': f"{q.get('v', 0):,}",
+                'High ($)': f"{q.get('h', 0):.2f}",
+                'Low ($)': f"{q.get('l', 0):.2f}"
+            })
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+        st.subheader('🔍 Aktie Details')
+        for item in watchlist_data:
+            q = item.get('quote', {})
+            ticker = item.get('ticker', '')
+            current_price = q.get('c', 0)
+            change = q.get('d', 0)
+            change_percent = q.get('dp', 0)
+            volume = q.get('v', 0)
+
+            with st.expander(f'📌 {ticker} - ${current_price:.2f}'):
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.metric('Aktueller Preis', f'${current_price:.2f}')
+                with c2:
+                    st.markdown(
+                        f"<div class={'positive' if change > 0 else 'negative'}>Änderung: ${change:.2f} ({change_percent:.2f}%)</div>",
+                        unsafe_allow_html=True
+                    )
+                with c3:
+                    st.metric('Volumen', f'{volume:,}')
+
+                if item.get('recommendations'):
+                    st.subheader('👨‍💼 Analysten-Empfehlungen')
+                    rec = item['recommendations']
+                    st.write(f"**Period:** {rec.get('period', '')}")
+                    st.write(f"**Strong Buy:** {rec.get('strongBuy', '')}")
+                    st.write(f"**Buy:** {rec.get('buy', '')}")
+                    st.write(f"**Hold:** {rec.get('hold', '')}")
+                    st.write(f"**Sell:** {rec.get('sell', '')}")
+                    st.write(f"**Strong Sell:** {rec.get('strongSell', '')}")
+
+                if item.get('news'):
+                    st.subheader(f'📰 Latest News für {ticker}')
                     for news in item['news'][:5]:
                         st.write(f"**{news.get('headline', '')}**")
                         st.write(f"{str(news.get('summary', ''))[:150]}...")

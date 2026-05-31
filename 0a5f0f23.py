@@ -144,9 +144,20 @@ if 'api_key' not in st.session_state:
 
 tab1, tab2, tab3, tab4 = st.tabs(['🔥 Tägliches Markt-Update', '📊 Live Watchlist', '💡 Aktie/Krypto Tipps', '🎯 Kaufoptionen-Analyse'])
 
+from deep_translator import GoogleTranslator
+
 with tab1:
     st.header('📰 Tägliches Markt-Update')
     st.markdown('Die wichtigsten Marktnews und Kursbewegungen für heute')
+
+    @st.cache_data(show_spinner=False)
+    def translate_to_german(text):
+        if not text:
+            return ''
+        try:
+            return GoogleTranslator(source='auto', target='de').translate(text)
+        except Exception:
+            return text
 
     def get_symbols(item):
         raw = item.get('symbol', '') or item.get('symbols', '') or ''
@@ -181,12 +192,14 @@ with tab1:
             impact = 'dürfte eher geringe direkte Kurswirkung haben.'
             color = '🟡'
 
-        if headline and summary:
-            short_de = f'{headline}. {summary[:220]}'
-        elif headline:
-            short_de = headline
-        elif summary:
-            short_de = summary[:220]
+        german_headline = translate_to_german(headline) if headline else ''
+        german_summary = translate_to_german(summary) if summary else ''
+        if german_headline and german_summary:
+            short_de = f'{german_headline}. {german_summary[:240]}'
+        elif german_headline:
+            short_de = german_headline
+        elif german_summary:
+            short_de = german_summary[:240]
         else:
             short_de = 'Keine verwertbare Meldung vorhanden.'
 
@@ -232,7 +245,7 @@ with tab1:
                 date_raw = news.get('datetime', '')
                 st.markdown(f"""
                 <div class="news-card">
-                    <strong>{impact['color']} {title}</strong><br>
+                    <strong>{impact['color']} {translate_to_german(title)}</strong><br>
                     <small><b>Deutsch:</b> {impact['short_de'][:260]}...</small><br>
                     <small><b>Marktwirkung:</b> {impact['direction']} – {impact['impact']}</small><br>
                     <small><b>Begründung:</b> {impact['reason']}</small><br>
@@ -249,7 +262,7 @@ with tab1:
             title = news.get('headline', 'Ohne Titel')
             symbol = get_symbols(news)
             source = news.get('source', '—')
-            with st.expander(f"{impact['color']} {title}"):
+            with st.expander(f"{impact['color']} {translate_to_german(title)}"):
                 st.write(f"**Kurz auf Deutsch:** {impact['short_de']}")
                 st.write(f"**Mögliche Marktwirkung:** {impact['direction']} – {impact['impact']}")
                 st.write(f"**Begründung:** {impact['reason']}")

@@ -282,6 +282,14 @@ with tab2:
     st.header('📊 Live Watchlist')
     st.markdown('Echtzeit-Kurse und Analysen deiner Watchlist')
 
+    def safe_num(x, default=0.0):
+        try:
+            if x is None:
+                return default
+            return float(x)
+        except (TypeError, ValueError):
+            return default
+
     if st.button('🔄 Watchlist aktualisieren', key='refresh_watchlist'):
         st.session_state['watchlist_data'] = None
         st.rerun()
@@ -315,11 +323,11 @@ with tab2:
             rows.append({
                 'Ticker': item.get('ticker', ''),
                 'Preis ($)': f"{safe_num(q.get('c')):.2f}",
-'Änderung ($)': f"{safe_num(q.get('d')):.2f}",
-'Änderung (%)': f"{safe_num(q.get('dp')):.2f}%",
-'Volumen': f"{int(safe_num(q.get('v'))):,}",
-'High ($)': f"{safe_num(q.get('h')):.2f}",
-'Low ($)': f"{safe_num(q.get('l')):.2f}"
+                'Änderung ($)': f"{safe_num(q.get('d')):.2f}",
+                'Änderung (%)': f"{safe_num(q.get('dp')):.2f}%",
+                'Volumen': f"{int(safe_num(q.get('v'))):,}",
+                'High ($)': f"{safe_num(q.get('h')):.2f}",
+                'Low ($)': f"{safe_num(q.get('l')):.2f}"
             })
         df = pd.DataFrame(rows)
         st.dataframe(df, use_container_width=True, hide_index=True)
@@ -328,24 +336,22 @@ with tab2:
         for item in watchlist_data:
             q = item.get('quote', {})
             ticker = item.get('ticker', '')
-            current_price = q.get('c', 0)
-            change = q.get('d', 0)
-            change_percent = q.get('dp', 0)
-            volume = q.get('v', 0)
+            current_price = safe_num(q.get('c'))
+            change = safe_num(q.get('d'))
+            change_percent = safe_num(q.get('dp'))
+            volume = int(safe_num(q.get('v')))
 
             with st.expander(f'📌 {ticker} - ${current_price:.2f}'):
                 c1, c2, c3 = st.columns(3)
-with c1:
-    st.metric('Aktueller Preis', f'${current_price:.2f}')
-
-with c2:
-    st.markdown(
-        f"<div class={'positive' if change > 0 else 'negative'}>Änderung: ${change:.2f} ({change_percent:.2f}%)</div>",
-        unsafe_allow_html=True
-    )
-
-with c3:
-    st.metric('Volumen', f'{volume:,}')
+                with c1:
+                    st.metric('Aktueller Preis', f'${current_price:.2f}')
+                with c2:
+                    st.markdown(
+                        f"<div class={'positive' if change > 0 else 'negative'}>Änderung: ${change:.2f} ({change_percent:.2f}%)</div>",
+                        unsafe_allow_html=True
+                    )
+                with c3:
+                    st.metric('Volumen', f'{volume:,}')
 
                 if item.get('recommendations'):
                     st.subheader('👨‍💼 Analysten-Empfehlungen')
@@ -368,7 +374,6 @@ with c3:
                         st.divider()
     else:
         st.warning('Konnte Watchlist-Daten nicht laden.')
-
 with tab3:
     st.header('💡 Potenzielle Gewinner diese Woche')
     st.markdown('Analyse basierend auf aktuellen Marktdaten und News. Keine Kaufberatung.')

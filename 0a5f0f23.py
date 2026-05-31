@@ -327,5 +327,5 @@ with tab4:
         st.info('Klicke auf "Kaufoptionen analysieren" um zu starten.')
 
 st.divider()
-st.markdown('---
-**⚠️ Haftungsausschluss**: Dieses Tool bietet nur Analysen und Informationen. Es ist keine Kaufberatung. Investiere nur Geld, das du verlieren kannst. Führe immer eigene Recherche durch (DYOR).')
+st.markdown('''---
+**⚠️ Haftungsausschluss**: Dieses Tool bietet nur Analysen und Informationen. Es ist keine Kaufberatung. Investiere nur Geld, das du verlieren kannst. Führe immer eigene Recherche durch (DYOR).''')

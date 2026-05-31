@@ -207,7 +207,19 @@ with tab2:
     watchlist_data = st.session_state.get('watchlist_data', [])
     if watchlist_data:
         st.subheader('📈 Watchlist Überblick')
-        df = pd.DataFrame([{ 'Ticker': item['ticker'], 'Preis ($)': f"{item['quote']['c']:.2f}", 'Änderung ($)': f"{item['quote']['d']:.2f}", 'Änderung (%)': f"{item['quote']['dp']:.2f}%", 'Volumen': f"{item['quote']['v']:,}", 'High ($)': f"{item['quote']['h']:.2f}", 'Low ($)': f"{item['quote']['l']:.2f}" } for item in watchlist_data])
+        rows = []
+for item in watchlist_data:
+    q = item.get('quote', {})
+    rows.append({
+        'Ticker': item.get('ticker', ''),
+        'Preis ($)': f"{q.get('c', 0):.2f}",
+        'Änderung ($)': f"{q.get('d', 0):.2f}",
+        'Änderung (%)': f"{q.get('dp', 0):.2f}%",
+        'Volumen': f"{q.get('v', 0):,}",
+        'High ($)': f"{q.get('h', 0):.2f}",
+        'Low ($)': f"{q.get('l', 0):.2f}",
+    })
+df = pd.DataFrame(rows)
         st.dataframe(df, use_container_width=True, hide_index=True)
         st.subheader('🔍 Aktie Details')
         for item in watchlist_data:

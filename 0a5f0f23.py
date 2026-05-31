@@ -20,49 +20,71 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.header("⚙️ Einstellungen")
-    api_key = st.text_input("Finnhub API-Key", type="password")
-    if api_key:
-        st.session_state['api_key'] = api_key
-        st.success("API-Key gespeichert!")
+    st.header('➕ Aktie hinzufügen')
+    st.caption('Gib Ticker oder Firmennamen ein')
+
+    if 'watchlist' not in st.session_state:
+        st.session_state['watchlist'] = []
+
+    def safe_num(x, default=0.0):
+        try:
+            if x is None:
+                return default
+            return float(x)
+        except (TypeError, ValueError):
+            return default
+
+    def search_symbols(query):
+        client = get_finnhub_client()
+        if not client:
+            return []
+        try:
+            res = client.symbol_lookup(query)
+            return res.get('result', []) if isinstance(res, dict) else []
+        except Exception:
+            return []
+
+    new_stock = st.text_input('Neue Aktie hinzufügen', placeholder='z.B. NVDA oder Rheinmetall', key='watchlist_search_input')
+
+    if st.button('🔎 Suchen', key='watchlist_search_btn'):
+        st.session_state['watchlist_search_results'] = search_symbols(new_stock.strip()) if new_stock.strip() else []
+        st.session_state['watchlist_search_term'] = new_stock.strip()
+
+    results = st.session_state.get('watchlist_search_results', [])
+    term = st.session_state.get('watchlist_search_term', '')
+
+    if term:
+        st.write(f'**Suche für:** {term}')
+
+    if results:
+        st.subheader('Vorschläge')
+        for r in results[:5]:
+            sym = r.get('symbol', '—')
+            desc = r.get('description', '—')
+            exchange = r.get('mic', '') or r.get('exchange', '') or r.get('type', '')
+            cols = st.columns([4, 1])
+            with cols[0]:
+                st.write(f'**{sym}** — {desc} ({exchange})')
+            with cols[1]:
+                if st.button('Übernehmen', key=f'use_{sym}'):
+                    if sym not in st.session_state['watchlist']:
+                        st.session_state['watchlist'].append(sym)
+                    st.session_state['watchlist_search_results'] = []
+                    st.session_state['watchlist_search_term'] = ''
+                    st.rerun()
+    elif term:
+        st.warning(f'Keine passende Aktie gefunden für: {term}')
 
     st.divider()
-    st.header("📝 Watchlist")
-    if 'watchlist' not in st.session_state:
-        st.session_state['watchlist'] = ['AAPL', 'GOOGL', 'TSLA', 'MSFT', 'AMZN']
-
-    new_stock = st.text_input("Neue Aktie hinzufügen (Ticker oder Firmenname)", placeholder="z.B. Rheinmetall oder RHM", key="new_stock_input")
-
-    if st.button("➕ Zur Watchlist hinzufügen", key="add_stock_btn"):
-        if new_stock.strip():
-            query_text = new_stock.strip()
-            quote = get_stock_quote(query_text.upper())
-
-            if quote and isinstance(quote, dict) and safe_num(quote.get('c')) > 0:
-                if query_text.upper() not in st.session_state['watchlist']:
-                    st.session_state['watchlist'].append(query_text.upper())
-                    st.success(f"{query_text.upper()} hinzugefügt!")
-                    st.rerun()
-            else:
-                st.warning(f"Keine direkte Quote gefunden für: {query_text}")
-                st.info("Mögliche Treffer aus der Börsensuche:")
-                results = search_symbols(query_text)
-                if results:
-                    for r in results[:5]:
-                        sym = r.get('symbol', '—')
-                        desc = r.get('description', '—')
-                        exchange = r.get('mic', '') or r.get('exchange', '') or r.get('type', '')
-                        col1, col2 = st.columns([4, 1])
-                        with col1:
-                            st.write(f"**{sym}** — {desc} ({exchange})")
-                        with col2:
-                            if st.button("Übernehmen", key=f"use_{sym}"):
-                                if sym not in st.session_state['watchlist']:
-                                    st.session_state['watchlist'].append(sym)
-                                    st.success(f"{sym} hinzugefügt!")
-                                    st.rerun()
-                else:
-                    st.info("Tipp: Probiere den Firmennamen, die ISIN oder einen kürzeren Ticker.")
+    st.subheader('Aktuelle Watchlist')
+    for i, ticker in enumerate(st.session_state['watchlist']):
+        c1, c2 = st.columns([4, 1])
+        with c1:
+            st.write(ticker)
+        with c2:
+            if st.button('✖', key=f'remove_{ticker}_{i}'):
+                st.session_state['watchlist'].pop(i)
+                st.rerun()
     
     st.info(f"Watchlist hat {len(st.session_state['watchlist'])} Aktien")
     new_stock = st.text_input("Neue Aktie hinzufügen (Ticker)", placeholder="z.B. NVDA", key="new_stock_input")
